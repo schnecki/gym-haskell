@@ -3,6 +3,7 @@ module ML.Gym
     ) where
 
 
+import           ML.Gym.Data  as Gym
 import           ML.Gym.DType as Gym
 import           ML.Gym.Gym   as Gym
 import           ML.Gym.Range as Gym

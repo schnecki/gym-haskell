@@ -2,6 +2,7 @@
 module ML.Gym.Range
   ( GymRange(..)
   , getGymRange
+  , gymRangeToDoubleLists
   ) where
 
 import           ML.Gym.DType
@@ -34,6 +35,13 @@ data GymRange = GymDoubleRange Double Double
               | GymBoolArrayRange Int -- ^ Holds length of array
               deriving (Show, Eq)
 
+gymRangeToDoubleLists :: GymRange -> ([Double],[Double])
+gymRangeToDoubleLists (GymDoubleRange lo hi) = ([lo], [hi])
+gymRangeToDoubleLists (GymIntegerRange lo hi) = ([fromIntegral lo], [fromIntegral hi])
+gymRangeToDoubleLists GymBoolRange = ([0], [1])
+gymRangeToDoubleLists (GymDoubleArrayRange los his) = (los, his)
+gymRangeToDoubleLists (GymIntegerArrayRange los his) = (map fromIntegral los, map fromIntegral his)
+gymRangeToDoubleLists (GymBoolArrayRange nr) = (replicate nr 0, replicate nr 1)
 
 getGymRange :: Py.Object space => GymDType -> space -> IO (Maybe GymRange)
 getGymRange  GymBool    = getGymRange' pyToBool (const . const $ GymBoolRange) (\xs _ -> GymBoolArrayRange (length xs))
@@ -43,7 +51,7 @@ getGymRange  GymObject  = getGymRange' pyToFloat GymDoubleRange GymDoubleArrayRa
 getGymRange tp          = error $ "cannot make range of type " ++ show tp
 
 numPyArray :: Py.SomeObject -> IO Py.SomeObject
-numPyArray obj = python (Py.callMethodArgs obj "tolist" [])
+numPyArray obj = python $ Py.callMethodArgs obj "tolist" []
 
 getGymRange' :: Py.Object space => (Py.SomeObject -> IO (Maybe a)) -> (a -> a -> GymRange) -> ([a] -> [a] -> GymRange)-> space -> IO (Maybe GymRange)
 getGymRange' convert gymRange gymRangeArray space = do
