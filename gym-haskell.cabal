@@ -1,0 +1,65 @@
+-- This file has been generated from package.yaml by hpack version 0.28.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: e18bfe8b2c7dd64f117c6810f8db998ac97f3c4408eb606c2cb68717e94e4742
+
+name:           gym-haskell
+version:        0.1.0.0
+synopsis:       Binding for Gym Open AI (https://gym.openai.com)
+description:    Please see the README on GitHub at <https://github.com/schnecki/gym-haskell#readme>
+category:       Machine Learning
+homepage:       https://github.com/schnecki/gym-haskell#readme
+bug-reports:    https://github.com/schnecki/gym-haskell/issues
+author:         Manuel Schneckenreither
+maintainer:     manuel.schneckenreither@uibk.ac.at
+copyright:      2019 Manuel Schneckenreither
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+cabal-version:  >= 1.10
+extra-source-files:
+    ChangeLog.md
+    README.md
+
+source-repository head
+  type: git
+  location: https://github.com/schnecki/gym-haskell
+
+library
+  exposed-modules:
+      ML.Gym
+      ML.Gym.DType
+      ML.Gym.Gym
+      ML.Gym.Range
+      ML.Gym.Shape
+      ML.Gym.Space
+      ML.Gym.Util
+  other-modules:
+      Paths_gym_haskell
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.7 && <5
+    , bytestring
+    , cpython
+    , random
+    , text
+  default-language: Haskell2010
+
+test-suite gym-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_gym_haskell
+  hs-source-dirs:
+      test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , bytestring
+    , cpython
+    , gym
+    , random
+    , text
+  default-language: Haskell2010

@@ -1,0 +1,41 @@
+name:                gym-haskell
+version:             0.1.0.0
+github:              "schnecki/gym-haskell"
+license:             BSD3
+author:              "Manuel Schneckenreither"
+maintainer:          "manuel.schneckenreither@uibk.ac.at"
+copyright:           "2019 Manuel Schneckenreither"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+synopsis:            Binding for Gym Open AI (https://gym.openai.com)
+category:            Machine Learning
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/schnecki/gym-haskell#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- cpython
+- bytestring
+- random
+- text
+
+library:
+  source-dirs: src
+
+tests:
+  gym-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - gym
