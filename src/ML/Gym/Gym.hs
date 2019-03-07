@@ -76,7 +76,7 @@ initGym envName = do
   name <- getProgName
   args <- getArgs
   Py.initialize
-  Py.setArgv (T.pack $ name ++ "-gym") (map T.pack args)
+  Py.setArgv (T.pack name <> "-" <> envName) (map T.pack args)
   gGym <- python $ Py.importModule "gym"
   pyName <- Py.toUnicode envName
   gEnv <- python $ Py.callMethodArgs gGym "make" [Py.toObject pyName]

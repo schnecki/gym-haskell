@@ -1,4 +1,5 @@
 .stack-work/
-gym.cabal
+gym-haskell.cabal
 *~
 /TAGS
+*.cabal
