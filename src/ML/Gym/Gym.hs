@@ -6,6 +6,7 @@ module ML.Gym.Gym
     , resetGym
     , stepGymRandom
     , stepGym
+    , setMaxEpisodeSteps
     ) where
 
 import           ML.Gym.Data
@@ -16,7 +17,7 @@ import           ML.Gym.Space
 import           ML.Gym.Util
 
 import qualified Control.Exception        as E
-import           Control.Monad            (void)
+import           Control.Monad            (void, when)
 import qualified CPython                  as Py
 import qualified CPython.Constants        as Py
 import qualified CPython.Protocols.Object as Py
@@ -87,6 +88,11 @@ initGym envName = do
 
 -------------------- Functions --------------------
 
+setMaxEpisodeSteps :: Gym -> Integer -> IO ()
+setMaxEpisodeSteps gym val = do
+  pyVal <- Py.toInteger val
+  python $ Py.toUnicode "_max_episode_steps" >>= \attr -> Py.setAttribute (env gym) attr (Py.toObject pyVal)
+
 resetGym :: Gym -> IO GymObservation
 resetGym gym = do
   gObs <- python $ Py.callMethodArgs (env gym) "reset" []
@@ -108,8 +114,9 @@ stepGym gym actIdx = do
   obs <- fromMaybe (error "could not convert observation to GymData") <$> python (getGymData (observationSpace gym) gObs)
   rew <- fromMaybe (error "could not convert reward to Double") <$> python (pyToDouble gReward)
   done <- fromMaybe (error "could not convert reward to Bool") <$> python (pyToBool gDone)
+  -- Py.print gDone
   -- void $ python $ Py.print reward stdout
-  -- void $ python $ Py.print done stdout
+  -- void $ python $ Py.print gDone stdout
   -- void $ python $ Py.print info stdout
   return $ GymResult obs rew done
 

@@ -1,8 +1,10 @@
--- This file has been generated from package.yaml by hpack version 0.28.2.
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.31.1.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 2669a1e5cb8c7c2f0c7d1c8d8c2500d07433d6eb3d6ab50319a6ab7f2f122f42
+-- hash: 298b080e05edac10bcef700da71c2929b415c61e53dd57fc9c7ab53ee92a7f89
 
 name:           gym-haskell
 version:        0.1.0.0
@@ -17,10 +19,9 @@ copyright:      2019 Manuel Schneckenreither
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
-cabal-version:  >= 1.10
 extra-source-files:
-    ChangeLog.md
     README.md
+    ChangeLog.md
 
 source-repository head
   type: git
