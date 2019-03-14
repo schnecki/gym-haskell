@@ -60,14 +60,12 @@ data GymResult = GymResult
 getActionSpace :: GymEnv -> IO GymActionSpace
 getActionSpace gEnv = do
   actSpace <- python $ Py.getAttribute gEnv =<< Py.toUnicode "action_space"
-  jsonActionSpace <- fromMaybe (error "could not get gym action space") <$> python (Py.callMethodArgs actSpace "__repr__" [] >>= pyToText)
-  toGymSpace actSpace jsonActionSpace
+  toGymSpace actSpace
 
 getObservationSpace :: GymEnv -> IO GymObservationSpace
 getObservationSpace gEnv = do
   obsSpace <- python $ Py.getAttribute gEnv =<< Py.toUnicode "observation_space"
-  jsonObservationSpace <- fromMaybe (error "could not get gym observation_space") <$> python (Py.callMethodArgs obsSpace "__repr__" [] >>= pyToText)
-  toGymSpace obsSpace jsonObservationSpace
+  toGymSpace obsSpace
 
 
 -- | Initializes the gym environment. It also resets the environment, s.t. `stepGym` can be called immediately.
@@ -101,14 +99,13 @@ resetGym gym = do
 
 stepGymRandom :: Gym -> IO GymResult
 stepGymRandom gym = do
-  idx <- randomRIO (0, dimension (actionSpace gym) - 1)
+  idx <- randomRIO (0, spaceSize (actionSpace gym) - 1)
   stepGym gym idx
 
 stepGym :: Gym -> Integer -> IO GymResult
 stepGym gym actIdx = do
   void $ python $ Py.callMethodArgs (env gym) "render" []
-  act <- python $ Py.toInteger actIdx
-  actionSpace <- Py.getAttribute (env gym) =<< Py.toUnicode "action_space"
+  act <- toAction (actionSpace gym) actIdx
   Just tuple <- python $ Py.callMethodArgs (env gym) "step" [Py.toObject act] >>= Py.cast
   [gObs, gReward, gDone, gInfo] <- python $ Py.fromTuple tuple
   obs <- fromMaybe (error "could not convert observation to GymData") <$> python (getGymData (observationSpace gym) gObs)
@@ -121,6 +118,7 @@ stepGym gym actIdx = do
   return $ GymResult obs rew done
 
 
+  -- actionSpace <- Py.getAttribute (env gym) =<< Py.toUnicode "action_space"
 -- sample <- python $ Py.callMethodArgs actionSpace "sample" []
 -- python $ Py.print sample stdout
 -- Just tuple <- python $ Py.callMethodArgs (env gym) "step" [Py.toObject sample] >>= Py.cast
