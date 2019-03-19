@@ -9,10 +9,11 @@ import           ML.Gym.DType
 import           ML.Gym.Range
 import           ML.Gym.Space
 import           ML.Gym.Util
+import           ML.Gym.Value
 
 import           Control.Applicative
 import qualified Control.Exception        as E
-import           Control.Monad            (void, (>=>))
+import           Control.Monad            (void, zipWithM, (>=>))
 import qualified CPython                  as Py
 import qualified CPython.Constants        as Py
 import qualified CPython.Protocols.Object as Py
@@ -28,35 +29,60 @@ import           System.Exit
 import           System.IO
 import           System.Random            (randomRIO)
 
+type GymData = GymValue Double
 
-data GymData =  GymDataDouble Double
-              | GymDataInteger Integer
-              | GymDataBool Bool
-              | GymDataDoubleList [Double]
-              | GymDataIntegerList [Integer]
-              | GymDataBoolList [Bool]
-              deriving (Show, Eq)
 
 gymObservationToDoubleList :: GymData -> [Double]
-gymObservationToDoubleList (GymDataDouble x)       = [x]
-gymObservationToDoubleList (GymDataInteger x)      = [fromIntegral x]
-gymObservationToDoubleList (GymDataBool x)         = [if x then 1 else 0]
-gymObservationToDoubleList (GymDataDoubleList xs)  = xs
-gymObservationToDoubleList (GymDataIntegerList xs) = map fromIntegral xs
-gymObservationToDoubleList (GymDataBoolList xs)    = map (\x -> if x then 1 else 0) xs
-
+gymObservationToDoubleList = gymValueTo1D
 
 getGymData :: GymSpace -> Py.SomeObject -> IO (Maybe GymData)
-getGymData (Discrete nr) obj = fmap GymDataInteger <$> pyToInteger obj
-getGymData (Box range _) obj = getGymDataRange range obj
+getGymData (Discrete nr) obj  = fmap (GymScalar . fromIntegral) <$> pyToInteger obj
+getGymData (Box range@(GymRange dt _ _) _) obj  = getGymValueWithRange range obj
+getGymData (Tuple spaces) obj = do
+  list <- fromMaybe (error "Gym discrete space 'n' not recognized!") <$> python (Py.toUnicode "spaces" >>= Py.getAttribute obj >>= pyToList)
+  fmap GymTuple . sequence <$> zipWithM getGymData spaces list
 
-getGymDataRange :: GymRange -> Py.SomeObject -> IO (Maybe GymData)
-getGymDataRange (GymDoubleRange lo hi) obj         = fmap GymDataDouble <$> pyToDouble obj
-getGymDataRange (GymIntegerRange lo hi) obj        = fmap GymDataInteger <$> pyToInteger obj
-getGymDataRange GymBoolRange obj                   = fmap GymDataBool <$> pyToBool obj
-getGymDataRange (GymDoubleArrayRange los his) obj  = fmap GymDataDoubleList <$> (numPyArray obj >>= pyToListOf pyToDouble)
-getGymDataRange (GymIntegerArrayRange los his) obj = fmap GymDataIntegerList <$> (numPyArray obj >>= pyToListOf pyToInteger)
-getGymDataRange (GymBoolArrayRange len) obj        = fmap GymDataBoolList <$> (numPyArray obj >>= pyToListOf pyToBool)
+fromScalar :: GymDType -> Py.SomeObject -> IO (Maybe (GymValue Double))
+fromScalar GymBool obj    = fmap (GymScalar . fromBool) <$> pyToBool obj
+fromScalar GymInteger obj = fmap (GymScalar . fromIntegral) <$> pyToInteger obj
+fromScalar GymFloat obj   = fmap GymScalar <$> pyToDouble obj
+fromScalar dt _           = error $ "missing implemenations in fromScalar: " ++ show dt
+
+from1D :: GymDType -> Py.SomeObject -> IO (Maybe (GymValue Double))
+from1D GymBool obj    = fmap (Gym1D . map fromBool) <$> pyToListOf pyToBool obj
+from1D GymInteger obj = fmap (Gym1D . map fromIntegral) <$> pyToListOf pyToInteger obj
+from1D GymFloat obj   = fmap Gym1D <$> pyToListOf pyToDouble obj
+from1D dt _           = error $ "missing implemenations in fromScalar: " ++ show dt
+
+from2D :: GymDType -> Py.SomeObject -> IO (Maybe (GymValue Double))
+from2D GymBool obj    = fmap (Gym2D . map (map fromBool)) <$> pyToListOfListOf pyToBool obj
+from2D GymInteger obj = fmap (Gym2D . map (map fromIntegral)) <$> pyToListOfListOf  pyToInteger obj
+from2D GymFloat obj   = fmap Gym2D <$> pyToListOfListOf pyToDouble obj
+from2D dt _           = error $ "missing implemenations in fromScalar: " ++ show dt
+
+from3D :: GymDType -> Py.SomeObject -> IO (Maybe (GymValue Double))
+from3D GymBool obj    = fmap (Gym3D . map (map (map fromBool))) <$> pyToListOfListOfListOf pyToBool obj
+from3D GymInteger obj = fmap (Gym3D . map (map (map fromIntegral))) <$> pyToListOfListOfListOf  pyToInteger obj
+from3D GymFloat obj   = fmap Gym3D <$> pyToListOfListOfListOf pyToDouble obj
+from3D dt _           = error $ "missing implemenations in fromScalar: " ++ show dt
+
+
+getGymValueWithRange :: GymRange -> Py.SomeObject -> IO (Maybe (GymValue Double))
+getGymValueWithRange (GymRange dt (GymScalar _) _) obj = fromScalar dt obj
+getGymValueWithRange (GymRange dt (Gym1D _) _) obj     = from1D dt obj
+getGymValueWithRange (GymRange dt (Gym2D _) _) obj     = from2D dt obj
+getGymValueWithRange (GymRange dt (Gym3D _) _) obj     = from3D dt obj
+getGymValueWithRange (GymRange dt (GymTuple xs) _) obj = do
+  list <- fromMaybe (error "Gym discrete space 'n' not recognized!") <$> python (Py.toUnicode "spaces" >>= Py.getAttribute obj >>= pyToList)
+  fmap GymTuple . sequence <$> zipWithM (\v o -> getGymValueWithRange (GymRange dt v (error "unused")) o) xs list
+
+
+-- getGymDataRange (GymDoubleRange lo hi) obj         = fmap GymDataDouble <$> pyToDouble obj
+-- getGymDataRange (GymIntegerRange lo hi) obj        = fmap GymDataInteger <$> pyToInteger obj
+-- getGymDataRange GymBoolRange obj                   = fmap GymDataBool <$> pyToBool obj
+-- getGymDataRange (GymDoubleArrayRange los his) obj  = fmap GymDataDoubleList <$> (numPyArray obj >>= pyToListOf pyToDouble)
+-- getGymDataRange (GymIntegerArrayRange los his) obj = fmap GymDataIntegerList <$> (numPyArray obj >>= pyToListOf pyToInteger)
+-- getGymDataRange (GymBoolArrayRange len) obj        = fmap GymDataBoolList <$> (numPyArray obj >>= pyToListOf pyToBool)
 
 numPyArray :: Py.SomeObject -> IO Py.SomeObject
 numPyArray obj = python $ Py.callMethodArgs obj "tolist" []

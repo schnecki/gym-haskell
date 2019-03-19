@@ -1,17 +1,19 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE OverloadedStrings         #-}
 module ML.Gym.Range
   ( GymRange(..)
+  , combineRanges
   , getGymRange
   , gymRangeToDoubleLists
-  , combineRanges
   ) where
 
 import           ML.Gym.DType
 import           ML.Gym.Util
+import           ML.Gym.Value
 
 import           Control.Applicative
 import qualified Control.Exception        as E
-import           Control.Monad            (void, (>=>))
+import           Control.Monad            (join, void, (>=>))
 import qualified CPython                  as Py
 import qualified CPython.Constants        as Py
 import qualified CPython.Protocols.Object as Py
@@ -20,6 +22,7 @@ import qualified CPython.Types.Exception  as Py
 import qualified CPython.Types.Module     as Py
 import qualified Data.ByteString          as BS
 import           Data.Complex             (Complex)
+import           Data.Foldable            (toList)
 import           Data.Maybe               (fromMaybe)
 import qualified Data.Text                as T
 import           System.Environment       (getArgs, getProgName)
@@ -27,69 +30,64 @@ import           System.Exit
 import           System.IO
 import           System.Random            (randomRIO)
 
+import           Debug.Trace
 
-data GymRange = GymDoubleRange Double Double
-              | GymDoubleArrayRange [Double] [Double]
-              | GymIntegerRange Integer Integer
-              | GymIntegerArrayRange [Integer] [Integer]
-              | GymBoolRange
-              | GymBoolArrayRange Int -- ^ Holds length of array
-              deriving (Show, Eq)
+data GymRange =
+  GymRange GymDType
+           (GymValue Double)    -- ^ Minimum values.
+           (GymValue Double)    -- ^ Maximum values.
+  deriving (Show, Eq)
+
 
 gymRangeToDoubleLists :: GymRange -> ([Double],[Double])
-gymRangeToDoubleLists (GymDoubleRange lo hi) = ([lo], [hi])
-gymRangeToDoubleLists (GymIntegerRange lo hi) = ([fromIntegral lo], [fromIntegral hi])
-gymRangeToDoubleLists GymBoolRange = ([0], [1])
-gymRangeToDoubleLists (GymDoubleArrayRange los his) = (los, his)
-gymRangeToDoubleLists (GymIntegerArrayRange los his) = (map fromIntegral los, map fromIntegral his)
-gymRangeToDoubleLists (GymBoolArrayRange nr) = (replicate nr 0, replicate nr 1)
-
-gymRangeFromDouleList :: Int -> ([Double], [Double]) -> GymRange
-gymRangeFromDouleList 1  (los,his)        = GymDoubleArrayRange  los his
-gymRangeFromDouleList 2       ([lo],[hi]) = GymDoubleRange lo hi
-gymRangeFromDouleList 3 (los, his)        = GymIntegerArrayRange (map round los) (map round his)
-gymRangeFromDouleList 4      ([lo], [hi]) = GymIntegerRange (round lo) (round hi)
-gymRangeFromDouleList 5    (xs,_)         = GymBoolArrayRange (length xs)
-gymRangeFromDouleList 6          _        = GymBoolRange
-gymRangeFromDouleList nr vals = error $ "cannot create GymRange in gymRangeFromDouleList with parameters " ++ show nr ++ " and " ++ show vals
-
+gymRangeToDoubleLists (GymRange _ los his) = (gymValueTo1D los, gymValueTo1D his)
 
 gymRangeTypePrecedence :: GymRange -> Int
-gymRangeTypePrecedence GymDoubleArrayRange{}  = 1
-gymRangeTypePrecedence GymDoubleRange {}      = 2
-gymRangeTypePrecedence GymIntegerArrayRange{} = 3
-gymRangeTypePrecedence GymIntegerRange{}      = 4
-gymRangeTypePrecedence GymBoolArrayRange{}    = 5
-gymRangeTypePrecedence GymBoolRange{}         = 6
+gymRangeTypePrecedence (GymRange dt _ _) = case dt of
+  GymBool    -> 1
+  GymInteger -> 2
+  GymFloat   -> 3
+  _          -> error $ "range type " ++ show dt ++ " not allowed"
 
+gymRangeTypeFromPrecedence :: Int -> GymDType
+gymRangeTypeFromPrecedence 1 = GymBool
+gymRangeTypeFromPrecedence 2 = GymInteger
+gymRangeTypeFromPrecedence 3 = GymFloat
+gymRangeTypeFromPrecedence nr = error $ "gym Range with precedence " ++ show nr ++ " is unknown"
 
 combineRanges :: [GymRange] -> GymRange
 combineRanges [] = error "empty list ranges in maxRange"
-combineRanges xs = gymRangeFromDouleList (minimum (map gymRangeTypePrecedence xs)) (foldl1 mkLoHiRanges (map gymRangeToDoubleLists xs))
-  where mkLoHiRanges (los,his) (los', his') | length los' > length los = mkLoHiRanges (los ++ drop (length los) los', his ++ drop (length his) his') (los', his')
-                                            | length los > length los' = mkLoHiRanges (los,his) (los' ++ drop (length los') los, his' ++ drop (length his') his)
-                                            | otherwise = (zipWith min los los', zipWith max his his')
+-- combineRanges xs = uncurry (GymRange (gymRangeTypeFromPrecedence $ maximum (map gymRangeTypePrecedence xs))) (foldl1 mkLoHiRanges (map gymRangeToDoubleLists xs))
+--   where mkLoHiRanges (los,his) (los', his') | length los' > length los = mkLoHiRanges (los ++ drop (length los) los', his ++ drop (length his) his') (los', his')
+--                                             | length los > length los' = mkLoHiRanges (los,his) (los' ++ drop (length los') los, his' ++ drop (length his') his)
+--                                             | otherwise = (zipWith min los los', zipWith max his his')
 
 getGymRange :: Py.Object space => GymDType -> space -> IO (Maybe GymRange)
-getGymRange  GymBool    = getGymRange' pyToBool (const . const $ GymBoolRange) (\xs _ -> GymBoolArrayRange (length xs))
-getGymRange  GymInteger = getGymRange' pyToInteger GymIntegerRange GymIntegerArrayRange
-getGymRange  GymFloat   = getGymRange' pyToFloat GymDoubleRange GymDoubleArrayRange
-getGymRange  GymObject  = getGymRange' pyToFloat GymDoubleRange GymDoubleArrayRange
-getGymRange tp          = error $ "cannot make range of type " ++ show tp
+getGymRange tp@GymBool    = getGymRange' pyToBool fromBool (GymRange tp)
+getGymRange tp@GymInteger = getGymRange' pyToInteger fromIntegral (GymRange tp)
+getGymRange tp@GymFloat   = getGymRange' pyToDouble id (GymRange tp)
+getGymRange tp@GymObject  = getGymRange' pyToDouble id (GymRange tp)
+getGymRange tp            = error $ "cannot make range of type " ++ show tp
 
 numPyArray :: Py.SomeObject -> IO Py.SomeObject
 numPyArray obj = python $ Py.callMethodArgs obj "tolist" []
 
-getGymRange' :: Py.Object space => (Py.SomeObject -> IO (Maybe a)) -> (a -> a -> GymRange) -> ([a] -> [a] -> GymRange)-> space -> IO (Maybe GymRange)
-getGymRange' convert gymRange gymRangeArray space = do
-  simple <- getLoHg convert gymRange space
-  list <- getLoHg (numPyArray >=> pyToListOf convert) gymRangeArray space
+getGymRange' :: Py.Object space => (Py.SomeObject -> IO (Maybe a)) -> (a -> Double) -> (GymValue Double -> GymValue Double -> GymRange) -> space -> IO (Maybe GymRange)
+getGymRange' convert mkGymVal gymRange space = do
+  simple <- getLoHg (convert >=> return . fmap (GymScalar . mkGymVal)) gymRange space
+  list <- getLoHg (\x -> fmap Gym1D <$> (numPyArray x >>= pyToListOf (fmap (fmap mkGymVal) . convert))) gymRange space
+  putStrLn $ "simple :" ++ show simple
+  putStrLn $ "list :" ++ show list
+  lowerBound space >>= flip Py.print stdout
   return $ simple <|> list
   where
     getLoHg convert gymRange space = do
       lo <- lowerBound space >>= convert
       hg <- upperBound space >>= convert
       return $ pure gymRange <*> lo <*> hg
+
+mkSpaceRepr :: Py.Object self => self -> IO T.Text
+mkSpaceRepr space = fromMaybe (error "could not get gym action space") <$> python (Py.callMethodArgs space "__repr__" [] >>= pyToText)
 
 
 lowerBound :: Py.Object space => space -> IO Py.SomeObject

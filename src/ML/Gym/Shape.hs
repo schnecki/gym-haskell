@@ -26,8 +26,9 @@ import           System.IO
 import           System.Random            (randomRIO)
 
 
-data GymShape = Gym1D Integer
-              | Gym2D Integer Integer
+data GymShape = GymShape1D Integer
+              | GymShape2D Integer Integer
+              | GymShape3D Integer Integer Integer
               deriving (Show, Eq)
 
 
@@ -36,8 +37,9 @@ getGymShape space = do
   let err = error "could not get gym shape"
   sh <- shape space >>= pyToTupleList >>= fmap (join . fmap sequence) . traverse (mapM pyToInteger)
   return $ mkGymShape <$> (sh :: Maybe [Integer])
-  where mkGymShape [x1]     = Gym1D x1
-        mkGymShape [x1, x2] = Gym2D x1 x2
+  where mkGymShape [x1]     = GymShape1D x1
+        mkGymShape [x1, x2] = GymShape2D x1 x2
+        mkGymShape [x1, x2, x3] = GymShape3D x1 x2 x3
         mkGymShape xs       = error $ "Gym shape '" ++ show xs ++ "' not supported yet!"
 
 shape :: Py.Object space => space -> IO Py.SomeObject

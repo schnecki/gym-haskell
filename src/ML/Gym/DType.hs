@@ -66,6 +66,18 @@ pyToList = pyToA Py.fromList
 pyToListOf :: (Py.SomeObject -> IO (Maybe a)) -> Py.SomeObject -> IO (Maybe [a])
 pyToListOf convert = fmap join . join . fmap (traverse (fmap sequence . mapM convert)) . pyToList
 
+pyToListOfListOf :: (Py.SomeObject -> IO (Maybe a)) -> Py.SomeObject -> IO (Maybe [[a]])
+pyToListOfListOf convert obj = do
+  mList <- pyToList obj
+  join . fmap sequence <$> sequence (mapM (pyToListOf convert) <$> mList)
+
+
+pyToListOfListOfListOf :: (Py.SomeObject -> IO (Maybe a)) -> Py.SomeObject -> IO (Maybe [[[a]]])
+pyToListOfListOfListOf convert obj = do
+  mList <- pyToList obj
+  join . fmap sequence <$> sequence (mapM (pyToListOfListOf convert) <$> mList)
+
+
 pyToA :: (Py.Concrete b) => (b -> IO a) -> Py.SomeObject -> IO (Maybe a)
 pyToA convert obj = do
   isNone <- Py.isNone obj
