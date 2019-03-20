@@ -31,28 +31,28 @@ import           Debug.Trace
 class SpaceSize a where
   spaceSize :: a -> Integer     -- Rename to something better
 
-data GymSpace = Discrete Integer        -- ^ Range: 0...(x-1)
-              | Box GymRange GymShape   -- ^ 1D, 2D, or 3D matrix. Range sizes and shape must coincide.
-              | Tuple [GymSpace]        -- ^ Tuple of Spaces.
+data GymSpace = GymSpaceDiscrete Integer        -- ^ Range: 0...(x-1)
+              | GymSpaceBox GymRange GymShape   -- ^ 1D, 2D, or 3D matrix. Range sizes and shape must coincide.
+              | GymSpaceTuple [GymSpace]        -- ^ Tuple of Spaces.
               deriving (Show, Eq)
 
 
 instance SpaceSize GymSpace where
-  spaceSize (Discrete nr)                 = nr
-  spaceSize (Box _ (GymShape1D x1))       = x1
-  spaceSize (Box _ (GymShape2D x1 x2))    = x1 * x2
-  spaceSize (Box _ (GymShape3D x1 x2 x3)) = x1 * x2 * x3
-  spaceSize (Tuple spaces)                = product (map spaceSize spaces)
+  spaceSize (GymSpaceDiscrete nr)                 = nr
+  spaceSize (GymSpaceBox _ (GymShape1D x1))       = x1
+  spaceSize (GymSpaceBox _ (GymShape2D x1 x2))    = x1 * x2
+  spaceSize (GymSpaceBox _ (GymShape3D x1 x2 x3)) = x1 * x2 * x3
+  spaceSize (GymSpaceTuple spaces)                = product (map spaceSize spaces)
 
 
 toAction :: GymSpace -> Integer -> IO Py.SomeObject
-toAction (Discrete nr) idx
+toAction (GymSpaceDiscrete nr) idx
   | idx < 0 || idx > (nr - 1) = error "Action index out of range"
   | otherwise = Py.toObject <$> Py.toInteger idx
-toAction (Box _ (GymShape1D x1)) idx = error "Box (probably continuous) actions currently not supported"
-toAction (Box _ (GymShape2D x1 x2)) idx = error "Box (probably continuous) actions currently not supported"
-toAction (Box _ (GymShape3D x1 x2 x3)) idx = error "Box (probably continuous) actions currently not supported"
-toAction (Tuple spaces) idx
+toAction (GymSpaceBox _ (GymShape1D x1)) idx = error "Box (probably continuous) actions currently not supported"
+toAction (GymSpaceBox _ (GymShape2D x1 x2)) idx = error "Box (probably continuous) actions currently not supported"
+toAction (GymSpaceBox _ (GymShape3D x1 x2 x3)) idx = error "Box (probably continuous) actions currently not supported"
+toAction (GymSpaceTuple spaces) idx
   | idx >= fromIntegral (length cats) = error "action index is out of range"
   | otherwise = Py.toObject <$> (mapM (fmap Py.toObject . Py.toInteger) (cats !! fromIntegral idx) >>= Py.toList)
   where
@@ -83,9 +83,9 @@ test cats = do
 
 
 getGymRangeFromSpace :: GymSpace -> GymRange
-getGymRangeFromSpace (Discrete nr)  = GymRange GymInteger (GymScalar 0) (GymScalar $ fromIntegral nr-1)
-getGymRangeFromSpace (Box rng _)    = rng
-getGymRangeFromSpace (Tuple spaces) =
+getGymRangeFromSpace (GymSpaceDiscrete nr)  = GymRange GymInteger (GymScalar 0) (GymScalar $ fromIntegral nr-1)
+getGymRangeFromSpace (GymSpaceBox rng _)    = rng
+getGymRangeFromSpace (GymSpaceTuple spaces) =
   trace ("from: " ++ show spaces)
   trace ("to: " ++ show (combineRanges $ map getGymRangeFromSpace spaces))
   combineRanges $ map getGymRangeFromSpace spaces
@@ -98,16 +98,16 @@ toGymSpace space = mkSpaceRepr >>= toGymSpace'
     toGymSpace' txt
       | T.isPrefixOf "Discrete" txt = do
         n <- fromMaybe (error "Gym discrete space 'n' not recognized!") <$> python (Py.toUnicode "n" >>= Py.getAttribute space >>= pyToInteger)
-        return $ Discrete n
+        return $ GymSpaceDiscrete n
       | T.isPrefixOf "Box" txt = do
         dType <- python $ Py.toUnicode "dtype" >>= Py.getAttribute space >>= getGymDType
         range <- fromMaybe (error $ "could not get gym range: " ++ show dType ++ ", " ++ T.unpack txt) <$> python (getGymRange dType space)
         shape <- fromMaybe (error "could not get gym shape") <$> python (getGymShape space)
-        return $ Box range shape
+        return $ GymSpaceBox range shape
       | T.isPrefixOf "Tuple" txt = do
           list <- fromMaybe (error "Gym discrete space 'n' not recognized!") <$> python (Py.toUnicode "spaces" >>= Py.getAttribute space >>= pyToList)
           spaces <- mapM toGymSpace list
-          return $ Tuple spaces
+          return $ GymSpaceTuple spaces
       | otherwise = do
         putStrLn "Sample space: "
         python (Py.callMethodArgs space "sample" [] >>= flip Py.print stdout)

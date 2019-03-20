@@ -76,10 +76,9 @@ getGymRange' :: Py.Object space => (Py.SomeObject -> IO (Maybe a)) -> (a -> Doub
 getGymRange' convert mkGymVal gymRange space = do
   simple <- getLoHg (convert >=> return . fmap (GymScalar . mkGymVal)) gymRange space
   list <- getLoHg (\x -> fmap Gym1D <$> (numPyArray x >>= pyToListOf (fmap (fmap mkGymVal) . convert))) gymRange space
-  putStrLn $ "simple :" ++ show simple
-  putStrLn $ "list :" ++ show list
-  lowerBound space >>= flip Py.print stdout
-  return $ simple <|> list
+  ll <- getLoHg (\x -> fmap Gym2D <$> (numPyArray x >>= pyToListOfListOf (fmap (fmap mkGymVal) . convert))) gymRange space
+  lll <- getLoHg (\x -> fmap Gym3D <$> (numPyArray x >>= pyToListOfListOfListOf (fmap (fmap mkGymVal) . convert))) gymRange space
+  return $ simple <|> list <|> ll <|> lll
   where
     getLoHg convert gymRange space = do
       lo <- lowerBound space >>= convert
