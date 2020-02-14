@@ -26,6 +26,7 @@ dependencies:
 - text
 - cpython >= 3.8
 
+
 library:
   source-dirs: src
   cc-options:
