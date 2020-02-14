@@ -1,0 +1,3 @@
+[submodule "haskell-cpython"]
+	path = haskell-cpython
+	url = git@github.com:schnecki/haskell-cpython.git

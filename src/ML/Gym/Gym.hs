@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE OverloadedStrings #-}
 module ML.Gym.Gym
     ( Gym (..)
@@ -42,16 +43,20 @@ type GymObservationSpace = GymSpace
 
 
 data Gym = Gym
-  { gym              :: GymModule
-  , env              :: GymEnv
-  , actionSpace      :: GymActionSpace
-  , observationSpace :: GymObservationSpace
+  { name             :: T.Text
+  , gym              :: !GymModule
+  , env              :: !GymEnv
+  , actionSpace      :: !GymActionSpace
+  , observationSpace :: !GymObservationSpace
   }
 
+instance Show Gym where
+  show (Gym n _ _ acts obs) = T.unpack n ++  "; Action Space: " ++ show acts ++ "; Observation Space: " ++ show obs
+
 data GymResult = GymResult
-  { observation :: GymObservation
-  , reward      :: Double
-  , episodeDone :: Bool
+  { observation :: !GymObservation
+  , reward      :: !Double
+  , episodeDone :: !Bool
   } deriving (Show, Eq)
 
 
@@ -73,16 +78,26 @@ initGym :: T.Text -> IO (GymObservation, Gym)
 initGym envName = do
   name <- getProgName
   args <- getArgs
+  -- putStrLn $ "Called: " ++ name  ++ " " ++ unwords args
   Py.initialize
+  res <- Py.isInitialized
+  version <- Py.getVersion
+  -- putStrLn $ "Initialized python: " ++ show res ++ "; Version: " ++ show version
   Py.setArgv (T.pack name <> "-" <> envName) (map T.pack args)
+  -- putStrLn "Arguments set"
   gGym <- python $ Py.importModule "gym"
+  -- putStrLn "Module imported"
   pyName <- Py.toUnicode envName
+  -- putStrLn "Calling make"
   gEnv <- python $ Py.callMethodArgs gGym "make" [Py.toObject pyName]
+  -- putStrLn "Createing action and observation space make"
   gActSpace <- getActionSpace gEnv
   gObsSpace <- getObservationSpace gEnv
+  -- putStrLn "Resetting environment"
   gObservation <- python $ Py.callMethodArgs gEnv "reset" []
   obs <- fromMaybe (error "could not convert observation to GymData") <$> python (getGymData gObsSpace gObservation)
-  return (obs, Gym gGym gEnv gActSpace gObsSpace)
+  -- putStrLn "Done"
+  return (obs, Gym envName gGym gEnv gActSpace gObsSpace)
 
 -------------------- Functions --------------------
 

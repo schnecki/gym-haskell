@@ -3,3 +3,4 @@ gym-haskell.cabal
 *~
 /TAGS
 *.cabal
+/*.lock

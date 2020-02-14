@@ -21,13 +21,29 @@ description:         Please see the README on GitHub at <https://github.com/schn
 
 dependencies:
 - base >= 4.7 && < 5
-- cpython
 - bytestring
 - random
 - text
+- cpython >= 3.8
 
 library:
   source-dirs: src
+  cc-options:
+    -fPIC
+  extra-libraries:
+    - python3.8
+
+executables:
+  cart-pole:
+    main:                CartPole.hs
+    source-dirs:         examples
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - gym-haskell
+
 
 tests:
   gym-test:
@@ -38,4 +54,5 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - gym
+    - gym-haskell
+    - hspec
