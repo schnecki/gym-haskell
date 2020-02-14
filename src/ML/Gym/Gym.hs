@@ -3,6 +3,7 @@
 module ML.Gym.Gym
     ( Gym (..)
     , GymResult (..)
+    , GymObservation
     , initGym
     , resetGym
     , stepGymRandom
