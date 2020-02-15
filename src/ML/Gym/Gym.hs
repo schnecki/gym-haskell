@@ -6,8 +6,11 @@ module ML.Gym.Gym
     , initGym
     , resetGym
     , stepGymRandom
+    , stepGymRenderRandom
     , stepGym
+    , stepGymRender
     , setMaxEpisodeSteps
+    , getMaxEpisodeSteps
     ) where
 
 import           ML.Gym.Data
@@ -101,31 +104,50 @@ initGym envName = do
 
 -------------------- Functions --------------------
 
+-- | Set the maximum number of steps before an episode is finished.
 setMaxEpisodeSteps :: Gym -> Integer -> IO ()
 setMaxEpisodeSteps gym val = do
   pyVal <- Py.toInteger val
   python $ Py.toUnicode "_max_episode_steps" >>= \attr -> Py.setAttribute (env gym) attr (Py.toObject pyVal)
 
+-- | Get the maximum number of steps before an episode is finished.
+getMaxEpisodeSteps :: Gym -> IO (Maybe Integer)
+getMaxEpisodeSteps gym = python $ Py.toUnicode "_max_episode_steps" >>= Py.getAttribute (env gym) >>= pyToInteger
+
+-- | Get the number of elapsed steps in this episode.
+getElapsedSteps :: Gym -> IO (Maybe Integer)
+getElapsedSteps gym = python $ Py.toUnicode "_elapsed_steps" >>= Py.getAttribute (env gym) >>= pyToInteger
+
+-- | Reset the environment.
 resetGym :: Gym -> IO GymObservation
 resetGym gym = do
   gObs <- python $ Py.callMethodArgs (env gym) "reset" []
   fromMaybe (error "could not convert observation to GymData") <$> python (getGymData (observationSpace gym) gObs)
 
-
+-- | Take a random step and renders the environment. Also see @stepGymRenderRandom@.
 stepGymRandom :: Gym -> IO GymResult
-stepGymRandom gym = do
-  idx <- randomRIO (0, spaceSize (actionSpace gym) - 1)
-  stepGym gym idx
+stepGymRandom = stepGymRenderRandom True
 
+-- | Take a random step and specify wether to render the environment or not.
+stepGymRenderRandom :: Bool -> Gym -> IO GymResult
+stepGymRenderRandom render gym = do
+  idx <- randomRIO (0, spaceSize (actionSpace gym) - 1)
+  stepGymRender render gym idx
+
+-- | Take a step as specified by the given action index. Renders the environment. See also @stepGymRender@.
 stepGym :: Gym -> Integer -> IO GymResult
-stepGym gym actIdx = do
-  void $ python $ Py.callMethodArgs (env gym) "render" []
+stepGym = stepGymRender True
+
+-- | Take a step as specified by the given action index. Choose wether to render the environment.
+stepGymRender :: Bool -> Gym -> Integer -> IO GymResult
+stepGymRender render gym actIdx = do
+  when render $ void $ python $ Py.callMethodArgs (env gym) "render" []
   act <- toAction (actionSpace gym) actIdx
   Just tuple <- python $ Py.callMethodArgs (env gym) "step" [Py.toObject act] >>= Py.cast
   [gObs, gReward, gDone, gInfo] <- python $ Py.fromTuple tuple
   obs <- fromMaybe (error "could not convert observation to GymData") <$> python (getGymData (observationSpace gym) gObs)
   rew <- fromMaybe (error "could not convert reward to Double") <$> python (pyToDouble gReward)
-  done <- fromMaybe (error "could not convert reward to Bool") <$> python (pyToBool gDone)
+  done <- fromMaybe (error "could not convert done falg to Bool") <$> python (pyToBool gDone)
   -- Py.print gDone
   -- void $ python $ Py.print reward stdout
   -- void $ python $ Py.print gDone stdout
@@ -133,7 +155,3 @@ stepGym gym actIdx = do
   return $ GymResult obs rew done
 
 
-  -- actionSpace <- Py.getAttribute (env gym) =<< Py.toUnicode "action_space"
--- sample <- python $ Py.callMethodArgs actionSpace "sample" []
--- python $ Py.print sample stdout
--- Just tuple <- python $ Py.callMethodArgs (env gym) "step" [Py.toObject sample] >>= Py.cast
