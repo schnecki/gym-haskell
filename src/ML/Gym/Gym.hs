@@ -12,6 +12,7 @@ module ML.Gym.Gym
     , stepGymRender
     , setMaxEpisodeSteps
     , getMaxEpisodeSteps
+    , getElapsedSteps
     ) where
 
 import           ML.Gym.Data
