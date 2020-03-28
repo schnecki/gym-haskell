@@ -5,6 +5,7 @@ module ML.Gym.Range
   , combineRanges
   , getGymRange
   , gymRangeToDoubleLists
+  , gymRangeToFloatLists
   ) where
 
 import           ML.Gym.DType
@@ -12,6 +13,7 @@ import           ML.Gym.Util
 import           ML.Gym.Value
 
 import           Control.Applicative
+import           Control.Arrow
 import qualified Control.Exception        as E
 import           Control.Monad            (join, void, (>=>))
 import qualified CPython                  as Py
@@ -41,6 +43,10 @@ data GymRange =
 
 gymRangeToDoubleLists :: GymRange -> ([Double],[Double])
 gymRangeToDoubleLists (GymRange _ los his) = (gymValueTo1D los, gymValueTo1D his)
+
+gymRangeToFloatLists :: GymRange -> ([Float],[Float])
+gymRangeToFloatLists = (map realToFrac *** map realToFrac) . gymRangeToDoubleLists
+
 
 gymRangeTypePrecedence :: GymRange -> Int
 gymRangeTypePrecedence (GymRange dt _ _) = case dt of

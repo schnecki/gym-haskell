@@ -3,6 +3,7 @@ module ML.Gym.Data
   ( GymData(..)
   , getGymData
   , gymObservationToDoubleList
+  , gymObservationToFloatList
   ) where
 
 import           ML.Gym.DType
@@ -34,6 +35,10 @@ type GymData = GymValue Double
 
 gymObservationToDoubleList :: GymData -> [Double]
 gymObservationToDoubleList = gymValueTo1D
+
+gymObservationToFloatList :: GymData -> [Float]
+gymObservationToFloatList = map realToFrac . gymObservationToDoubleList
+
 
 getGymData :: GymSpace -> Py.SomeObject -> IO (Maybe GymData)
 getGymData (GymSpaceDiscrete nr) obj  = fmap (GymScalar . fromIntegral) <$> pyToInteger obj
