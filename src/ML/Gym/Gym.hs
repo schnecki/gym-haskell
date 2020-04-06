@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns      #-}
+``{-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE OverloadedStrings #-}
 module ML.Gym.Gym
     ( Gym (..)
@@ -48,7 +48,7 @@ type GymObservationSpace = GymSpace
 
 
 data Gym = Gym
-  { name             :: T.Text
+  { name             :: !T.Text
   , gym              :: !GymModule
   , env              :: !GymEnv
   , actionSpace      :: !GymActionSpace
