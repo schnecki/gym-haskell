@@ -1,4 +1,4 @@
-``{-# LANGUAGE BangPatterns      #-}
+{-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE OverloadedStrings #-}
 module ML.Gym.Gym
     ( Gym (..)
