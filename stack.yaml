@@ -1,9 +1,7 @@
-resolver: lts-16.20
+resolver:
+  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/18/11.yaml
 # resolver: lts-12.26
 packages:
 - .
-- haskell-cpython
+- ../haskell-cpython
 extra-deps:
-- chell-0.5@sha256:6076ba6cdf2d4ce59a8b5fa828a2e13feecd7a9c9f8e3f6d65a4c70178e623e1,2192
-- ansi-terminal-0.8.2@sha256:56aeb0dbbf83905dfb39e11047d9f8562ab1e7eb601b2492082ba5b5a0fc80ec,3116
-- patience-0.3@sha256:fe3a2c5b1ac4d3425bad3d1ee0b6bb529b6e74ab41151f8526f26fc8dfa1206b,1252
